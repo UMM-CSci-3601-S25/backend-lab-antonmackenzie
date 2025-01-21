@@ -295,32 +295,47 @@ _why_ we'd want to have it.
 - [ ] :question: _1_ What is the purpose of `.gitignore`?
       ([Maybe search for `.gitignore`?](https://www.google.com/search?q=.gitignore))
 
+       **The ".gitignore" file signals Git to ignore (not track) untracked files.**
+
 - [ ] :question: _2_ What role is Gradle playing in the
       project, and what is the purpose of `build.gradle`?
 
+      **Gradle builds the code within the project. This involves gathering the needed dependencies, repositories, and other needed information and compiling it, creating a executable for the function to run.**
+
 - [ ] :question: _3_ What is the purpose of Github Actions?
+      **Github Actions allows users to automate specific actions of a project's build and testing processes via GitHub. By using workflows, one may configure a set of jobs to run in parallel, allowing for faster, efficient productivity when working on a GitHub project.**
 
 - [ ] :question: _4_ Explain what an _endpoint_ is (also often called a _route_). (You might look at the
       [Javalin](https://javalin.io/documentation#endpoint-handlers)
       documentation for some help here.)
 
+      **An endpoint acts as the defining feature for API usage, allowing for communication via the client and yourself. By using handlers like GET to send data to another client and POST to receive data, endpoints allow users to easily communicate with other computers connected to a server.**
+
 - [ ] :question: _5_ What is the purpose of `umm3601.Server` class?
+- [ ] **In short, umm3601/Server.class allows a user to set up Javalin server by using MongoDB as a client. Within the class, the Server constructor obtains a MongoClient object and a Controller array. Then, these parameters get defined in the variables printed above the methods and constructor of the Server class. To start the server, one needs to call upon the startServer function by creating a Server object. With this, the startServer function creates a javalin object and sets it as the return value of configureJavalin() in the Server class. Then, startServer sets up the endpoints (routes) using the javalin object. Afterwards, javalin then uses its start method to run an instance of Javalin using the port specified in the constant SERVER_PORT in the Server class.** 
       What is the purpose of the `umm3601.user.UserController` class?
+      **UserController acts as a method to create or delete entries of a user within a MongoDatabase object. Said MongoDatabase object also allows for the searching of users by age, company, and other parameters and the sending of data via a JSON file to the inquirer (i.e. a server) by using the GET and POST endpoints.**
       Explain what happens when a user accesses each of the
       following URLs:
 
+
   - [ ] :question: The page `users`
     - <http://localhost:4567/users.html>
+    - **This query cannot find "/users.html." This occurs due to failing to append the proper directory (i.e. "api/" ) before "users"**
   - [ ] :question: The page `api/users`
     - <http://localhost:4567/api/users>
+    - **As this query properly addresses the directory to the "users.html" file and doesn't specify any filters (e.g., age), the GET query returns all the users within the database.**
   - [ ] :question: The page `api/users?age=25`
     - <http://localhost:4567/api/users?age=25>
+    - **As this query properly addresses the directory to the "users.html" file and specifies a age of "25" for the filer, the GET query returns all the users within the database that possess an age of 25.**
   - [ ] :question: The page `api/users/588935f5de613130e931ffd5`
     - <http://localhost:4567/api/users/588935f5de613130e931ffd5>
+    - **As this query properly addresses the directory to the "users.html" file and specifies an _id of "588935f5de613130e931ffd5," the GET query returns one user due to only that user possessing that specific _id.**
 
 :bangbang: Have your project running (see the README), and use these links -- they should actually work and generate results from your server.
 
 - [ ] :question: _6_ What is in the `client` folder? What is the purpose of each of the HTML files there?
+**DO NOT ANSWER**
 
 - [ ] :question: _7_ Describe what happens when you filter users by age in the client.
 
