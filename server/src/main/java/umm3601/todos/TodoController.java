@@ -1,4 +1,4 @@
-package umm3601.user;
+package umm3601.todos;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,31 +32,31 @@ import umm3601.Controller;
 /**
  * Controller that manages requests for info about users.
  */
-public class UserController implements Controller {
+public class TodoController implements Controller {
 
-  private static final String API_USERS = "/api/users";
-  private static final String API_USER_BY_ID = "/api/users/{id}";
-  static final String AGE_KEY = "age";
-  static final String COMPANY_KEY = "company";
-  static final String ROLE_KEY = "role";
-  static final String SORT_ORDER_KEY = "sortorder";
+  private static final String API_TODOS = "/api/todos";
+  private static final String API_TODOS_BY_OID = "/api/todos/{$oid}";
+  static final String OWNER_KEY = "owner";
+  static final String STATUS_KEY = "status";
+  static final String BODY_KEY = "body";
+  static final String CATEGORY_KEY = "category";
 
   private static final int REASONABLE_AGE_LIMIT = 150;
-  private static final String ROLE_REGEX = "^(admin|editor|viewer)$";
+  private static final String CATEGORY_REGEX = "^(video games|homework|software design|groceries)$";
   public static final String EMAIL_REGEX = "^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$";
 
-  private final JacksonMongoCollection<User> userCollection;
+  private final JacksonMongoCollection<Todo> todoCollection;
 
   /**
    * Construct a controller for users.
    *
    * @param database the database containing user data
    */
-  public UserController(MongoDatabase database) {
-    userCollection = JacksonMongoCollection.builder().build(
+  public TodoController(MongoDatabase database) {
+    todoCollection = JacksonMongoCollection.builder().build(
         database,
         "users",
-        User.class,
+        Todo.class,
         UuidRepresentation.STANDARD);
   }
 
@@ -68,17 +68,17 @@ public class UserController implements Controller {
    */
   public void getUser(Context ctx) {
     String id = ctx.pathParam("id");
-    User user;
+    Todo todo;
 
     try {
-      user = userCollection.find(eq("_id", new ObjectId(id))).first();
+      todo = todoCollection.find(eq("_id", new ObjectId(id))).first();
     } catch (IllegalArgumentException e) {
       throw new BadRequestResponse("The requested user id wasn't a legal Mongo Object ID.");
     }
-    if (user == null) {
+    if (todo == null) {
       throw new NotFoundResponse("The requested user was not found");
     } else {
-      ctx.json(user);
+      ctx.json(todo);
       ctx.status(HttpStatus.OK);
     }
   }
@@ -97,7 +97,7 @@ public class UserController implements Controller {
     // database system. So MongoDB is going to find the users with the specified
     // properties, return those sorted in the specified manner, and put the
     // results into an initially empty ArrayList.
-    ArrayList<User> matchingUsers = userCollection
+    ArrayList<Todo> matchingUsers = todoCollection
       .find(combinedFilter)
       .sort(sortingOrder)
       .into(new ArrayList<>());
@@ -135,9 +135,9 @@ public class UserController implements Controller {
         .get();
       filters.add(eq(AGE_KEY, targetAge));
     }
-    if (ctx.queryParamMap().containsKey(COMPANY_KEY)) {
-      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(COMPANY_KEY)), Pattern.CASE_INSENSITIVE);
-      filters.add(regex(COMPANY_KEY, pattern));
+    if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
+      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(CATEGORY_KEY)), Pattern.CASE_INSENSITIVE);
+      filters.add(regex(STATUS_KEY, pattern));
     }
     if (ctx.queryParamMap().containsKey(ROLE_KEY)) {
       String role = ctx.queryParamAsClass(ROLE_KEY, String.class)
@@ -146,11 +146,23 @@ public class UserController implements Controller {
       filters.add(eq(ROLE_KEY, role));
     }
 
+    if (ctx.queryParamMap().containsKey(CATEGORY_KEY)) {
+      String category = ctx.queryParamAsClass(CATEGORY_KEY, String.class)
+        .check(it -> it.matches(CATEGORY_REGEX), "Owner must possess a legal category")
+        .get();
+      filters.add(eq(CATEGORY_KEY, category));
+    }
+    if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
+      Boolean status = ctx.queryParamAsClass(STATUS_KEY, Boolean.class)
+      filters.add(eq(STATUS_KEY, status));
+    }
+
     // Combine the list of filters into a single filtering document.
     Bson combinedFilter = filters.isEmpty() ? new Document() : and(filters);
 
     return combinedFilter;
   }
+
 
   /**
    * Construct a Bson sorting document to use in the `sort` method based on the
@@ -162,7 +174,7 @@ public class UserController implements Controller {
    * parameter is not present, it defaults to "name". If the `sortorder`
    * query parameter is not present, it defaults to "asc".
    *
-   * @param ctx a Javalin HTTP context, which contains the query parameters
+   * @param ctx a Javalin HTTP context, which contains the query p"status": false,arameters
    *   used to construct the sorting order
    * @return a Bson sorting document that can be used in the `sort` method
    *  to sort the database collection of users
@@ -191,12 +203,12 @@ public class UserController implements Controller {
    *   (in either `asc` or `desc` order) or by the number of users in the
    *   company (`count`, also in either `asc` or `desc` order).
    */
-  public void getUsersGroupedByCompany(Context ctx) {
+  public void getTodosGroupedByCategory(Context ctx) {
     // We'll support sorting the results either by company name (in either `asc` or `desc` order)
     // or by the number of users in the company (`count`, also in either `asc` or `desc` order).
-    String sortBy = Objects.requireNonNullElse(ctx.queryParam("sortBy"), "_id");
-    if (sortBy.equals("company")) {
-      sortBy = "_id";
+    String sortBy = Objects.requireNonNullElse(ctx.queryParam("sortBy"), "$oid");
+    if (sortBy.equals("category")) {
+      sortBy = "$oid";
     }
     String sortOrder = Objects.requireNonNullElse(ctx.queryParam("sortOrder"), "asc");
     Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(sortBy) : Sorts.ascending(sortBy);
@@ -205,11 +217,11 @@ public class UserController implements Controller {
     // name, the number of users in that company, and a list of user names and IDs
     // (using the `UserIdName` class to store the user names and IDs).
     // We're going to use the aggregation pipeline to group users by company, and
-    // then count the number of users in each company. We'll also collect the user
+    // then count the number of users in each company. We'll also collect the userserver/src/main/java/umm3601/user/UserIdName.java
     // names and IDs for each user in each company. We'll then convert the results
     // of the aggregation pipeline to `UserByCompany` objects.
 
-    ArrayList<UserByCompany> matchingUsers = userCollection
+    ArrayList<TodoByCategory> matchingTodos = todoCollection
       // The following aggregation pipeline groups users by company, and
       // then counts the number of users in each company. It also collects
       // the user names and IDs for each user in each company.
@@ -218,7 +230,7 @@ public class UserController implements Controller {
           // Project the fields we want to use in the next step, i.e., the _id, name, and company fields
           new Document("$project", new Document("_id", 1).append("name", 1).append("company", 1)),
           // Group the users by company, and count the number of users in each company
-          new Document("$group", new Document("_id", "$company")
+          new Document("$group", new Document("_id", "$category")
             // Count the number of users in each company
             .append("count", new Document("$sum", 1))
             // Collect the user names and IDs for each user in each company
@@ -231,11 +243,11 @@ public class UserController implements Controller {
         // Convert the results of the aggregation pipeline to UserGroupResult objects
         // (i.e., a list of UserGroupResult objects). It is necessary to have a Java type
         // to convert the results to, and the JacksonMongoCollection will do this for us.
-        UserByCompany.class
+        TodoByCategory.class
       )
       .into(new ArrayList<>());
 
-    ctx.json(matchingUsers);
+    ctx.json(matchingTodos);
     ctx.status(HttpStatus.OK);
   }
 
@@ -262,7 +274,7 @@ public class UserController implements Controller {
      * `BadRequestResponse` with an appropriate error message.
      */
     String body = ctx.body();
-    User newUser = ctx.bodyValidator(User.class)
+    Todo newUser = ctx.bodyValidator(Todo.class)
       .check(usr -> usr.name != null && usr.name.length() > 0,
         "User must have a non-empty user name; body was " + body)
       .check(usr -> usr.email.matches(EMAIL_REGEX),
@@ -281,7 +293,7 @@ public class UserController implements Controller {
     newUser.avatar = generateAvatar(newUser.email);
 
     // Add the new user to the database
-    userCollection.insertOne(newUser);
+    todoCollection.insertOne(newUser);
 
     // Set the JSON response to be the `_id` of the newly created user.
     // This gives the client the opportunity to know the ID of the new user,
@@ -300,9 +312,9 @@ public class UserController implements Controller {
    *
    * @param ctx a Javalin HTTP context
    */
-  public void deleteUser(Context ctx) {
+  public void deleteTodo(Context ctx) {
     String id = ctx.pathParam("id");
-    DeleteResult deleteResult = userCollection.deleteOne(eq("_id", new ObjectId(id)));
+    DeleteResult deleteResult = todoCollection.deleteOne(eq("_id", new ObjectId(id)));
     // We should have deleted 1 or 0 users, depending on whether `id` is a valid user ID.
     if (deleteResult.getDeletedCount() != 1) {
       ctx.status(HttpStatus.NOT_FOUND);
@@ -384,19 +396,19 @@ public class UserController implements Controller {
    */
   public void addRoutes(Javalin server) {
     // Get the specified user
-    server.get(API_USER_BY_ID, this::getUser);
+    server.get(API_TODOS_BY_OID, this::getUser);
 
     // List users, filtered using query parameters
-    server.get(API_USERS, this::getUsers);
+    server.get(API_TODOS, this::getUsers);
 
     // Get the users, possibly filtered, grouped by company
     server.get("/api/usersByCompany", this::getUsersGroupedByCompany);
 
     // Add new user with the user info being in the JSON body
     // of the HTTP request
-    server.post(API_USERS, this::addNewUser);
+    server.post(API_TODOS, this::addNewUser);
 
     // Delete the specified user
-    server.delete(API_USER_BY_ID, this::deleteUser);
+    server.delete(API_TODOS_BY_OID, this::deleteUser);
   }
 }
