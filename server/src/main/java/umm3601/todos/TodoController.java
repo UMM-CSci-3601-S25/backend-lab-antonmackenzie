@@ -33,7 +33,7 @@ import umm3601.Controller;
 public class TodoController implements Controller {
 
   private static final String API_TODOS = "/api/todos";
-  private static final String API_TODOS_BY_OID = "/api/todos/{$oid}";
+  private static final String API_TODOS_BY_OID = "/api/todos/{id}";
   static final String OWNER_KEY = "owner";
   static final String STATUS_KEY = "status";
   static final String BODY_KEY = "body";
@@ -53,7 +53,7 @@ public class TodoController implements Controller {
   public TodoController(MongoDatabase database) {
     todoCollection = JacksonMongoCollection.builder().build(
         database,
-        "owners",
+        "todos",
         Todo.class,
         UuidRepresentation.STANDARD);
   }
@@ -203,13 +203,13 @@ public class TodoController implements Controller {
       .aggregate(
         List.of(
           // Project the fields we want to use in the next step, i.e., the _id, name, and company fields
-          new Document("$project", new Document("_id", 1).append("name", 1).append("company", 1)),
+          new Document("$project", new Document("_id", 1).append("owner", 1).append("category", 1)),
           // Group the users by company, and count the number of users in each company
           new Document("$group", new Document("_id", "$category")
             // Count the number of users in each company
             .append("count", new Document("$sum", 1))
             // Collect the user names and IDs for each user in each company
-            .append("users", new Document("$push", new Document("_id", "$_id").append("name", "$name")))),
+            .append("todos", new Document("$push", new Document("_id", "$_id").append("owner", "$owner")))),
           // Sort the results. Use the `sortby` query param (default "company")
           // as the field to sort by, and the query param `sortorder` (default
           // "asc") to specify the sort order.
@@ -278,7 +278,7 @@ public class TodoController implements Controller {
   /**
    * Delete the user specified by the `id` parameter in the request.
    *
-   * @param ctx a Javalin HTTP context
+   * @param ctx getUsera Javalin HTTP context
    */
   public void deleteTodo(Context ctx) {
     String id = ctx.pathParam("id");
@@ -307,18 +307,6 @@ public class TodoController implements Controller {
    * @param email the email to generate an avatar for
    * @return a URI pointing to an avatar image
    */
-  String generateAvatar(String email) {
-    String avatar;
-    try {
-      // generate unique md5 code for identicon
-      avatar = "https://gravatar.com/avatar/" + md5(email) + "?d=identicon";
-    } catch (NoSuchAlgorithmException ignored) {
-      // set to mystery person
-      avatar = "https://gravatar.com/avatar/?d=mp";
-    }
-    return avatar;
-  }
-
   /**
    * Utility function to generate the md5 hash for a given string
    *
