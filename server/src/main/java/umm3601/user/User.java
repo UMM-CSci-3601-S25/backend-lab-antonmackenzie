@@ -1,9 +1,4 @@
 package umm3601.user;
-
-import org.mongojack.Id;
-import org.mongojack.ObjectId;
-
-// There are two examples of suppressing CheckStyle
 // warnings in this class. If you create new classes
 // that mirror data in MongoDB and that will be managed
 // by MongoJack, then you'll probably need to suppress
@@ -21,7 +16,7 @@ import org.mongojack.ObjectId;
 @SuppressWarnings({"VisibilityModifier"})
 public class User {
 
-  @ObjectId @Id
+
   // By default Java field names shouldn't start with underscores.
   // Here, though, we *have* to use the name `_id` to match the
   // name of the field as used by MongoDB.

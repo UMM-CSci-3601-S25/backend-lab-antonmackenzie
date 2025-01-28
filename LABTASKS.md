@@ -156,7 +156,7 @@ You should move the issues you really expect to do into the `Ready`
 track, leaving all the other issues (that you may
 or may not do) in the `Backlog` track.
 
-Now, you are ready to get started working on the coding part of this lab!
+Now, you are ready to get started working on the coding part of this lab!closes the query
 
 ### Using the board
 
@@ -224,7 +224,8 @@ Below are the various features we'd like to see you implement in this lab. You s
 create an epic for each of the features listed below, adding at issues as appropriate.
 
 At the very least (necessary to get 85% of this part of the lab)
-you should implement (and create meaningful server-side tests for) the following features:
+you should implement (and create meaningful server-side tests for) the followinOne thing you should **not** do is create separate tasks for things like unit tests
+> or refactoring. Those activities should be "baked in" tg features:
 
 - List all the todos
   - [ ] Implement an `api/todos` server-side endpoint, which returns all the to-dos
@@ -340,6 +341,10 @@ _why_ we'd want to have it.
 - [ ] :question: _7_ Describe what happens when you filter users by age in the client.
 
   - [ ] What exactly is the request that is sent to the server?
+  **It directs to the port hosted on this computer (http://localhost:4567/api). Then, the request fetches the users as indicated by (/users) and uses a ? as a indication to filter out a set of data with a given filter (e.g., age, ?age=x).**
   - [ ] How does the server react to the request?
+  **The server retrieves the data from the database by sending a endpoint query that fits the filter applied.**
   - [ ] What reply does the database send back to the server?
+   **The database sends back a JSON file with the filtered out data or an error message explaining why it failed to retrieve the desired query.**
   - [ ] What is the response to the client?
+   **The server sends a response to the client's web browser. Then, that response gets interpreted client-side.**

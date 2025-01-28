@@ -53,7 +53,7 @@ public class TodoController implements Controller {
   public TodoController(MongoDatabase database) {
     todoCollection = JacksonMongoCollection.builder().build(
         database,
-        "users",
+        "owners",
         Todo.class,
         UuidRepresentation.STANDARD);
   }
@@ -149,7 +149,7 @@ public class TodoController implements Controller {
    * parameter is not present, it defaults to "name". If the `sortorder`
    * query parameter is not present, it defaults to "asc".
    *
-   * @param ctx a Javalin HTTP context, which contains the query p"status": false,arameters
+   * @param ctx a Javalin HTTP context, whic                                       ^h contains the query p"status": false,arameters
    *   used to construct the sorting order
    * @return a Bson sorting document that can be used in the `sort` method
    *  to sort the database collection of users
