@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 import org.bson.Document;
 import org.bson.UuidRepresentation;
@@ -18,7 +17,6 @@ import org.mongojack.JacksonMongoCollection;
 import com.mongodb.client.MongoDatabase;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.regex;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.result.DeleteResult;
 
@@ -127,34 +125,11 @@ public class TodoController implements Controller {
   private Bson constructFilter(Context ctx) {
     List<Bson> filters = new ArrayList<>(); // start with an empty list of filters
 
-    if (ctx.queryParamMap().containsKey(AGE_KEY)) {
-      int targetAge = ctx.queryParamAsClass(AGE_KEY, Integer.class)
-        .check(it -> it > 0, "User's age must be greater than zero; you provided " + ctx.queryParam(AGE_KEY))
-        .check(it -> it < REASONABLE_AGE_LIMIT,
-          "User's age must be less than " + REASONABLE_AGE_LIMIT + "; you provided " + ctx.queryParam(AGE_KEY))
-        .get();
-      filters.add(eq(AGE_KEY, targetAge));
-    }
-    if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
-      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(CATEGORY_KEY)), Pattern.CASE_INSENSITIVE);
-      filters.add(regex(STATUS_KEY, pattern));
-    }
-    if (ctx.queryParamMap().containsKey(ROLE_KEY)) {
-      String role = ctx.queryParamAsClass(ROLE_KEY, String.class)
-        .check(it -> it.matches(ROLE_REGEX), "User must have a legal user role")
-        .get();
-      filters.add(eq(ROLE_KEY, role));
-    }
-
     if (ctx.queryParamMap().containsKey(CATEGORY_KEY)) {
       String category = ctx.queryParamAsClass(CATEGORY_KEY, String.class)
         .check(it -> it.matches(CATEGORY_REGEX), "Owner must possess a legal category")
         .get();
       filters.add(eq(CATEGORY_KEY, category));
-    }
-    if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
-      Boolean status = ctx.queryParamAsClass(STATUS_KEY, Boolean.class)
-      filters.add(eq(STATUS_KEY, status));
     }
 
     // Combine the list of filters into a single filtering document.
@@ -258,7 +233,7 @@ public class TodoController implements Controller {
    * @param ctx a Javalin HTTP context that provides the user info
    *  in the JSON body of the request
    */
-  public void addNewUser(Context ctx) {
+  public void addNewOwner(Context ctx) {
     /*
      * The follow chain of statements uses the Javalin validator system
      * to verify that instance of `User` provided in this context is
@@ -274,32 +249,25 @@ public class TodoController implements Controller {
      * `BadRequestResponse` with an appropriate error message.
      */
     String body = ctx.body();
-    Todo newUser = ctx.bodyValidator(Todo.class)
-      .check(usr -> usr.name != null && usr.name.length() > 0,
-        "User must have a non-empty user name; body was " + body)
-      .check(usr -> usr.email.matches(EMAIL_REGEX),
-        "User must have a legal email; body was " + body)
-      .check(usr -> usr.age > 0,
-        "User's age must be greater than zero; body was " + body)
-      .check(usr -> usr.age < REASONABLE_AGE_LIMIT,
-        "User's age must be less than " + REASONABLE_AGE_LIMIT + "; body was " + body)
-      .check(usr -> usr.role.matches(ROLE_REGEX),
-        "User must have a legal user role; body was " + body)
-      .check(usr -> usr.company != null && usr.company.length() > 0,
-        "User must have a non-empty company name; body was " + body)
+    Todo newOwner = ctx.bodyValidator(Todo.class)
+      .check(usr -> usr.owner != null && usr.owner.length() > 0,
+        "Owner must have a non-empty name; body was " + body)
+      .check(usr -> usr.status != true || usr.status != false,
+        "Owner must possess a legal status; body was " + body)
+      .check(usr -> usr.body.length() > 0,
+        "The length of the owner's body must be greater than zero; body was " + body)
+      .check(usr -> usr.category.length() > 0,
+        "The length of the owner's category must be greater than zero; body was " + body)
       .get();
 
-    // Generate a user avatar (you won't need this part for todos)
-    newUser.avatar = generateAvatar(newUser.email);
-
     // Add the new user to the database
-    todoCollection.insertOne(newUser);
+    todoCollection.insertOne(newOwner);
 
     // Set the JSON response to be the `_id` of the newly created user.
     // This gives the client the opportunity to know the ID of the new user,
     // which it can then use to perform further operations (e.g., a GET request
     // to get and display the details of the new user).
-    ctx.json(Map.of("id", newUser._id));
+    ctx.json(Map.of("id", newOwner._id));
     // 201 (`HttpStatus.CREATED`) is the HTTP code for when we successfully
     // create a new resource (a user in this case).
     // See, e.g., https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
@@ -402,13 +370,13 @@ public class TodoController implements Controller {
     server.get(API_TODOS, this::getUsers);
 
     // Get the users, possibly filtered, grouped by company
-    server.get("/api/usersByCompany", this::getUsersGroupedByCompany);
+    server.get("/api/TodoByCategory", this::getTodosGroupedByCategory);
 
     // Add new user with the user info being in the JSON body
     // of the HTTP request
-    server.post(API_TODOS, this::addNewUser);
+    server.post(API_TODOS, this::addNewOwner);
 
     // Delete the specified user
-    server.delete(API_TODOS_BY_OID, this::deleteUser);
+    server.delete(API_TODOS_BY_OID, this::deleteTodo);
   }
 }
