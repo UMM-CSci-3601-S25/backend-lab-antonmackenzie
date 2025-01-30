@@ -38,10 +38,12 @@ public class TodoController implements Controller {
   static final String STATUS_KEY = "status";
   static final String BODY_KEY = "body";
   static final String CATEGORY_KEY = "category";
+  static final String LIMIT_KEY = "limit";
 
-  private static final int REASONABLE_AGE_LIMIT = 150;
+
   private static final String CATEGORY_REGEX = "^(video games|homework|software design|groceries)$";
   public static final String EMAIL_REGEX = "^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$";
+  private Todo[] allTodos;
 
   private final JacksonMongoCollection<Todo> todoCollection;
 
@@ -108,12 +110,10 @@ public class TodoController implements Controller {
     // Explicitly set the context status to OK
     ctx.status(HttpStatus.OK);
   }
-
   /**
    * Construct a Bson filter document to use in the `find` method based on the
    * query parameters from the context.
-   *
-   * This checks for the presence of the `age`, `company`, and `role` query
+   *Ageresence of the `age`, `company`, and `role` query
    * parameters and constructs a filter document that will match users with
    * the specified values for those fields.
    *
@@ -130,6 +130,12 @@ public class TodoController implements Controller {
         .check(it -> it.matches(CATEGORY_REGEX), "Owner must possess a legal category")
         .get();
       filters.add(eq(CATEGORY_KEY, category));
+    }
+    if (ctx.queryParamMap().containsKey(LIMIT_KEY)) {
+      int todoLimit = ctx.queryParamAsClass(LIMIT_KEY, Integer.class)
+        .check(it -> it > 0, "Todo's Limit must be greater than zero; you provided " + ctx.queryParam(LIMIT_KEY))
+        .get();
+        filters.add(eq(LIMIT_KEY, todoLimit));
     }
 
     // Combine the list of filters into a single filtering document.
