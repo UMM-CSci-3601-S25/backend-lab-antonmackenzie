@@ -33,15 +33,17 @@ import umm3601.Controller;
 public class TodoController implements Controller {
 
   private static final String API_TODOS = "/api/todos";
-  private static final String API_TODOS_BY_OID = "/api/todos/{id}";
+  private static final String API_TODOS_BY_OID = "/api/todos/{$oid}";
   static final String OWNER_KEY = "owner";
   static final String STATUS_KEY = "status";
   static final String BODY_KEY = "body";
   static final String CATEGORY_KEY = "category";
   static final String LIMIT_KEY = "limit";
 
-  private static final int REASONABLE_AGE_LIMIT = 150;
+
+  private static final String CATEGORY_REGEX = "^(video games|homework|software design|groceries)$";
   public static final String EMAIL_REGEX = "^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$";
+  private Todo[] allTodos;
 
   private final JacksonMongoCollection<Todo> todoCollection;
 
@@ -108,12 +110,10 @@ public class TodoController implements Controller {
     // Explicitly set the context status to OK
     ctx.status(HttpStatus.OK);
   }
-
   /**
    * Construct a Bson filter document to use in the `find` method based on the
    * query parameters from the context.
-   *
-   * This checks for the presence of the `age`, `company`, and `role` query
+   *Ageresence of the `age`, `company`, and `role` query
    * parameters and constructs a filter document that will match users with
    * the specified values for those fields.
    *
@@ -127,6 +127,7 @@ public class TodoController implements Controller {
 
     if (ctx.queryParamMap().containsKey(CATEGORY_KEY)) {
       String category = ctx.queryParamAsClass(CATEGORY_KEY, String.class)
+        .check(it -> it.matches(CATEGORY_REGEX), "Owner must possess a legal category")
         .get();
       filters.add(eq(CATEGORY_KEY, category));
     }
@@ -225,20 +226,20 @@ public class TodoController implements Controller {
     // names and IDs for each user in each company. We'll then convert the results
     // of the aggregation pipeline to `UserByCompany` objects.
 
-    ArrayList<TodoByOwner> matchingTodos = todoCollection
+    ArrayList<TodoByCategory> matchingTodos = todoCollection
       // The following aggregation pipeline groups users by company, and
       // then counts the number of users in each company. It also collects
       // the user names and IDs for each user in each company.
       .aggregate(
         List.of(
           // Project the fields we want to use in the next step, i.e., the _id, name, and company fields
-          new Document("$project", new Document("_id", 1).append("owner", 1).append("owner", 1)),
+          new Document("$project", new Document("_id", 1).append("name", 1).append("company", 1)),
           // Group the users by company, and count the number of users in each company
-          new Document("$group", new Document("_id", "$owner")
+          new Document("$group", new Document("_id", "$category")
             // Count the number of users in each company
             .append("count", new Document("$sum", 1))
             // Collect the user names and IDs for each user in each company
-            .append("todos", new Document("$push", new Document("_id", "$_id").append("owner", "$owner")))),
+            .append("users", new Document("$push", new Document("_id", "$_id").append("name", "$name")))),
           // Sort the results. Use the `sortby` query param (default "company")
           // as the field to sort by, and the query param `sortorder` (default
           // "asc") to specify the sort order.
@@ -247,13 +248,15 @@ public class TodoController implements Controller {
         // Convert the results of the aggregation pipeline to UserGroupResult objects
         // (i.e., a list of UserGroupResult objects). It is necessary to have a Java type
         // to convert the results to, and the JacksonMongoCollection will do this for us.
-        TodoByOwner.class
+        TodoByCategory.class
       )
       .into(new ArrayList<>());
 
     ctx.json(matchingTodos);
     ctx.status(HttpStatus.OK);
   }
+
+
   public void getTodosGroupedByStatus(Context ctx)
   {
     String sortBy = Objects.requireNonNullElse(ctx.queryParam("sortBy"), "$oid");
@@ -262,7 +265,6 @@ public class TodoController implements Controller {
     }
     String sortOrder = Objects.requireNonNullElse(ctx.queryParam("sortOrder"), "asc");
     Bson sortingOrder = sortOrder.equals("desc") ?  Sorts.descending(sortBy) : Sorts.ascending(sortBy);
-
     // The `UserByCompany` class is a simple class that has fields for the company
     // name, the number of users in that company, and a list of user names and IDs
     // (using the `UserIdName` class to store the user names and IDs).
@@ -270,7 +272,6 @@ public class TodoController implements Controller {
     // then count the number of users in each company. We'll also collect the userserver/src/main/java/umm3601/user/UserIdName.java
     // names and IDs for each user in each company. We'll then convert the results
     // of the aggregation pipeline to `UserByCompany` objects.
-
     ArrayList<TodoByStatus> matchingTodos = todoCollection
       // The following aggregation pipeline groups users by company, and
       // then counts the number of users in each company. It also collects
@@ -457,7 +458,7 @@ public class TodoController implements Controller {
   /**
    * Delete the user specified by the `id` parameter in the request.
    *
-   * @param ctx getUsera Javalin HTTP context
+   * @param ctx a Javalin HTTP context
    */
   public void deleteTodo(Context ctx) {
     String id = ctx.pathParam("id");
@@ -486,6 +487,18 @@ public class TodoController implements Controller {
    * @param email the email to generate an avatar for
    * @return a URI pointing to an avatar image
    */
+  String generateAvatar(String email) {
+    String avatar;
+    try {
+      // generate unique md5 code for identicon
+      avatar = "https://gravatar.com/avatar/" + md5(email) + "?d=identicon";
+    } catch (NoSuchAlgorithmException ignored) {
+      // set to mystery person
+      avatar = "https://gravatar.com/avatar/?d=mp";
+    }
+    return avatar;
+  }
+
   /**
    * Utility function to generate the md5 hash for a given string
    *
@@ -501,6 +514,7 @@ public class TodoController implements Controller {
     }
     return result.toString();
   }
+
 
   /**
    * Setup routes for the `user` collection endpoints.
@@ -539,7 +553,7 @@ public class TodoController implements Controller {
     // Get the users, possibly filtered, grouped by category
     server.get("/api/TodoByCategory", this::getTodosGroupedByCategory);
 
-    //Get the users by owner (name)
+        //Get the users by owner (name)
     server.get("/api/TodoByOwner", this::getTodosGroupedByOwner);
 
     server.get("/api/TodoByStatus", this::getTodosGroupedByStatus);
