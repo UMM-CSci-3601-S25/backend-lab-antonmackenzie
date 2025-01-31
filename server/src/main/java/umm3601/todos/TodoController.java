@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 import org.bson.Document;
 import org.bson.UuidRepresentation;
@@ -17,6 +18,7 @@ import org.mongojack.JacksonMongoCollection;
 import com.mongodb.client.MongoDatabase;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.regex;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.result.DeleteResult;
 
@@ -39,6 +41,7 @@ public class TodoController implements Controller {
   static final String BODY_KEY = "body";
   static final String CATEGORY_KEY = "category";
   static final String LIMIT_KEY = "limit";
+  static final String CONTAINS_KEY = "contains";
 
 
   private static final String CATEGORY_REGEX = "^(video games|homework|software design|groceries)$";
@@ -148,6 +151,10 @@ public class TodoController implements Controller {
         .check(it -> it > 0, "Todo's Limit must be greater than zero; you provided " + ctx.queryParam(LIMIT_KEY))
         .get();
         filters.add(eq(LIMIT_KEY, todoLimit));
+    }
+    if (ctx.queryParamMap().containsKey(CONTAINS_KEY)) {
+      Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(CONTAINS_KEY)), Pattern.CASE_INSENSITIVE);
+      filters.add(regex(BODY_KEY, pattern));
     }
     // Combine the list of filters into a single filtering document.
     Bson combinedFilter = filters.isEmpty() ? new Document() : and(filters);
