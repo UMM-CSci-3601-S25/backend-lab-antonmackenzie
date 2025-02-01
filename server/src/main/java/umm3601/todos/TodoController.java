@@ -42,10 +42,6 @@ public class TodoController implements Controller {
   static final String CATEGORY_KEY = "category";
   static final String LIMIT_KEY = "limit";
   static final String CONTAINS_KEY = "contains";
-
-
-  private static final String CATEGORY_REGEX = "^(video games|homework|software design|groceries)$";
-  public static final String EMAIL_REGEX = "^[a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[a-zA-Z0-9.-]+$";
   private Todo[] allTodos;
 
   private final JacksonMongoCollection<Todo> todoCollection;
@@ -130,7 +126,6 @@ public class TodoController implements Controller {
 
     if (ctx.queryParamMap().containsKey(CATEGORY_KEY)) {
       String category = ctx.queryParamAsClass(CATEGORY_KEY, String.class)
-        .check(it -> it.matches(CATEGORY_REGEX), "Owner must possess a legal category")
         .get();
       filters.add(eq(CATEGORY_KEY, category));
     }
@@ -142,9 +137,10 @@ public class TodoController implements Controller {
     }
 
     if (ctx.queryParamMap().containsKey(STATUS_KEY)) {
-      Boolean category = ctx.queryParamAsClass(STATUS_KEY, Boolean.class)
-        .get();
-      filters.add(eq(STATUS_KEY, category));
+      String completeness = ctx.queryParamAsClass(STATUS_KEY, String.class)
+      .check(it-> it.toLowerCase().equals("complete") || it.toLowerCase().equals("incomplete"), "Input does not query for complete or incomplete todos; Input provided: " + ctx.queryParam(STATUS_KEY))
+      .get();
+    filters.add(eq(STATUS_KEY, completeness.toLowerCase().equals("complete")));
     }
     if (ctx.queryParamMap().containsKey(LIMIT_KEY)) {
       int todoLimit = ctx.queryParamAsClass(LIMIT_KEY, Integer.class)
@@ -240,13 +236,13 @@ public class TodoController implements Controller {
       .aggregate(
         List.of(
           // Project the fields we want to use in the next step, i.e., the _id, name, and company fields
-          new Document("$project", new Document("_id", 1).append("name", 1).append("company", 1)),
+          new Document("$project", new Document("_id", 1).append("owner", 1)),
           // Group the users by company, and count the number of users in each company
-          new Document("$group", new Document("_id", "$category")
+          new Document("$group", new Document("_id", "$owner")
             // Count the number of users in each company
             .append("count", new Document("$sum", 1))
             // Collect the user names and IDs for each user in each company
-            .append("users", new Document("$push", new Document("_id", "$_id").append("name", "$name")))),
+            .append("users", new Document("$push", new Document("_id", "$_id").append("owner", "$owner")))),
           // Sort the results. Use the `sortby` query param (default "company")
           // as the field to sort by, and the query param `sortorder` (default
           // "asc") to specify the sort order.
