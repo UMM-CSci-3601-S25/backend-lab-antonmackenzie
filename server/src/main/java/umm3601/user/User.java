@@ -1,4 +1,8 @@
 package umm3601.user;
+
+import org.mongojack.Id;
+import org.mongojack.ObjectId;
+
 // warnings in this class. If you create new classes
 // that mirror data in MongoDB and that will be managed
 // by MongoJack, then you'll probably need to suppress
@@ -15,6 +19,7 @@ package umm3601.user;
 // build when Gradle runs CheckStyle.
 @SuppressWarnings({"VisibilityModifier"})
 public class User {
+  @ObjectId @Id
 
 
   // By default Java field names shouldn't start with underscores.
