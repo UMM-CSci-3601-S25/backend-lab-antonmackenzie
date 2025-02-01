@@ -195,7 +195,7 @@ class TodoControllerSpec {
     // Check that the database collection holds the same number of documents
     // as the size of the captured List<Todo>
     assertEquals(
-        db.getCollection("Todos").countDocuments(),
+        db.getCollection("todos").countDocuments(),
         TodoArrayListCaptor.getValue().size());
   }
 }
