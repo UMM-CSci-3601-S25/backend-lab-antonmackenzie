@@ -99,6 +99,7 @@ public class TodoController implements Controller {
     ArrayList<Todo> matchingUsers = todoCollection
       .find(combinedFilter)
       .sort(sortingOrder)
+      .limit(getLimit(ctx))
       .into(new ArrayList<>());
 
     // Set the JSON body of the response to be the list of users returned by the database.
@@ -141,12 +142,6 @@ public class TodoController implements Controller {
       .check(it-> it.toLowerCase().equals("complete") || it.toLowerCase().equals("incomplete"), "Input does not query for complete or incomplete todos; Input provided: " + ctx.queryParam(STATUS_KEY))
       .get();
     filters.add(eq(STATUS_KEY, completeness.toLowerCase().equals("complete")));
-    }
-    if (ctx.queryParamMap().containsKey(LIMIT_KEY)) {
-      int todoLimit = ctx.queryParamAsClass(LIMIT_KEY, Integer.class)
-        .check(it -> it > 0, "Todo's Limit must be greater than zero; you provided " + ctx.queryParam(LIMIT_KEY))
-        .get();
-        filters.add(eq(LIMIT_KEY, todoLimit));
     }
     if (ctx.queryParamMap().containsKey(CONTAINS_KEY)) {
       Pattern pattern = Pattern.compile(Pattern.quote(ctx.queryParam(CONTAINS_KEY)), Pattern.CASE_INSENSITIVE);
@@ -490,17 +485,7 @@ public class TodoController implements Controller {
    * @param email the email to generate an avatar for
    * @return a URI pointing to an avatar image
    */
-  String generateAvatar(String email) {
-    String avatar;
-    try {
-      // generate unique md5 code for identicon
-      avatar = "https://gravatar.com/avatar/" + md5(email) + "?d=identicon";
-    } catch (NoSuchAlgorithmException ignored) {
-      // set to mystery person
-      avatar = "https://gravatar.com/avatar/?d=mp";
-    }
-    return avatar;
-  }
+
 
   /**
    * Utility function to generate the md5 hash for a given string
