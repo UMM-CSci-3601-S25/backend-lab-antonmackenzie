@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -11,6 +12,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,8 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.json.JavalinJackson;
+import io.javalin.validation.Validation;
+import io.javalin.validation.Validator;
 
 /**
  * Tests the logic of the TodoController
@@ -53,7 +57,7 @@ class TodoControllerSpec {
 
   // An instance of the controller we're testing that is prepared in
   // `setupEach()`, and then exercised in the various tests below.
-  private TodoController TodoController;
+  private TodoController todoController;
 
   // A Mongo object ID that is initialized in `setupEach()` and used
   // in a few of the tests. It isn't used all that often, though,
@@ -115,7 +119,7 @@ class TodoControllerSpec {
     MockitoAnnotations.openMocks(this);
 
     // Setup database
-    MongoCollection<Document> TodoDocuments = db.getCollection("Todos");
+    MongoCollection<Document> TodoDocuments = db.getCollection("todos");
     TodoDocuments.drop();
     List<Document> testTodos = new ArrayList<>();
     testTodos.add(
@@ -153,13 +157,13 @@ class TodoControllerSpec {
     TodoDocuments.insertMany(testTodos);
     TodoDocuments.insertOne(Jimmy);
 
-    TodoController = new TodoController(db);
+    todoController = new TodoController(db);
   }
 
   @Test
   void addsRoutes() {
     Javalin mockServer = mock(Javalin.class);
-    TodoController.addRoutes(mockServer);
+    todoController.addRoutes(mockServer);
     verify(mockServer, Mockito.atLeast(3)).get(any(), any());
     verify(mockServer, Mockito.atLeastOnce()).post(any(), any());
     verify(mockServer, Mockito.atLeastOnce()).delete(any(), any());
@@ -174,7 +178,7 @@ class TodoControllerSpec {
 
     // Now, go ahead and ask the TodoController to getTodos
     // (which will, indeed, ask the context for its queryParamMap)
-    TodoController.getUsers(ctx);
+    todoController.getUsers(ctx);
 
     // We are going to capture an argument to a function, and the type of
     // that argument will be of type ArrayList<Todo> (we said so earlier
@@ -197,5 +201,209 @@ class TodoControllerSpec {
     assertEquals(
         db.getCollection("todos").countDocuments(),
         TodoArrayListCaptor.getValue().size());
+
   }
+
+  @Test
+  void getOwnerByCategory()
+  {
+    when(ctx.queryParamMap()).thenReturn(Collections.emptyMap());
+
+    todoController.getUsers(ctx);
+
+  }
+  @Test
+  void getOwner() {
+    String owner = "Chris";
+    Map<String, List<String>> queryParams = new HashMap<>();
+    queryParams.put(TodoController.OWNER_KEY, Arrays.asList(new String[] {owner}));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    when(ctx.queryParam(TodoController.OWNER_KEY)).thenReturn(owner);
+
+    Validation validation = new Validation();
+    // The `AGE_KEY` should be name of the key whose value is being validated.
+    // You can actually put whatever you want here, because it's only used in the generation
+    // of testing error reports, but using the actually key value will make those reports more informative.
+    Validator<String> validator = validation.validator(TodoController.OWNER_KEY, String.class, owner);
+    // When the code being tested calls `ctx.queryParamAsClass("age", Integer.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.OWNER_KEY, String.class))
+        .thenReturn(validator);
+
+    todoController.getUsers(ctx);
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(TodoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back two users.
+    assertEquals(1, TodoArrayListCaptor.getValue().size());
+    // Confirm that both users have age 37.
+    for (Todo todo : TodoArrayListCaptor.getValue()) {
+      assertEquals(owner, todo.owner);
+    }
+    // Generate a list of the names of the returned users.
+
+
+  }
+
+  @Test
+  void getStatus() {
+    String status = "complete";
+    Map<String, List<String>> queryParams = new HashMap<>();
+    queryParams.put(TodoController.STATUS_KEY, Arrays.asList(status));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    when(ctx.queryParam(TodoController.STATUS_KEY)).thenReturn(status);
+
+    Validation validation = new Validation();
+    // The `AGE_KEY` should be name of the key whose value is being validated.
+    // You can actually put whatever you want here, because it's only used in the generation
+    // of testing error reports, but using the actually key value will make those reports more informative.
+    Validator<String> validator = validation.validator(TodoController.STATUS_KEY, String.class, status);
+    // When the code being tested calls `ctx.queryParamAsClass("age", Integer.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.STATUS_KEY, String.class))
+        .thenReturn(validator);
+
+    todoController.getUsers(ctx);
+
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(TodoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back two users.
+    assertEquals(1, TodoArrayListCaptor.getValue().size());
+    // Confirm that both users have age 37.
+    for (Todo todo : TodoArrayListCaptor.getValue()) {
+      String isComplete = "false";
+      if(todo.status = true)
+      {
+        isComplete = "complete";
+      }
+      assertEquals(status, isComplete);
+    }
+    // Generate a list of the names of the returned users.
+
+
+  }
+
+
+  @Test
+  void getBody() {
+    String containTarget = "potato";
+    Map<String, List<String>> queryParams = new HashMap<>();
+    queryParams.put(TodoController.CONTAINS_KEY, Arrays.asList(new String[] {containTarget}));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    when(ctx.queryParam(TodoController.CONTAINS_KEY)).thenReturn(containTarget);
+
+    Validation validation = new Validation();
+    // The `AGE_KEY` should be name of the key whose value is being validated.
+    // You can actually put whatever you want here, because it's only used in the generation
+    // of testing error reports, but using the actually key value will make those reports more informative.
+    Validator<String> validator = validation.validator(TodoController.CONTAINS_KEY, String.class, containTarget);
+    // When the code being tested calls `ctx.queryParamAsClass("age", Integer.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.CONTAINS_KEY, String.class))
+        .thenReturn(validator);
+
+    todoController.getUsers(ctx);
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(TodoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back two users.
+    assertEquals(1, TodoArrayListCaptor.getValue().size());
+    // Confirm that both users have age 37.
+    for (Todo todo : TodoArrayListCaptor.getValue()) {
+
+      assertTrue(todo.body.contains(containTarget));
+    }
+    // Generate a list of the names of the returned users.
+
+
+  }
+
+  @Test
+  void getCategory() {
+    String targetCategory = "homework";
+    Map<String, List<String>> queryParams = new HashMap<>();
+    queryParams.put(TodoController.CATEGORY_KEY, Arrays.asList(targetCategory));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    when(ctx.queryParam(TodoController.CATEGORY_KEY)).thenReturn(targetCategory);
+
+    Validation validation = new Validation();
+    // The `AGE_KEY` should be name of the key whose value is being validated.
+    // You can actually put whatever you want here, because it's only used in the generation
+    // of testing error reports, but using the actually key value will make those reports more informative.
+    Validator<String> validator = validation.validator(TodoController.CATEGORY_KEY, String.class, targetCategory);
+    // When the code being tested calls `ctx.queryParamAsClass("age", Integer.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.CATEGORY_KEY, String.class))
+        .thenReturn(validator);
+
+    todoController.getUsers(ctx);
+
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(TodoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back two users.
+    assertEquals(1, TodoArrayListCaptor.getValue().size());
+    // Confirm that both users have age 37.
+    for (Todo todo : TodoArrayListCaptor.getValue()) {
+
+      assertEquals(targetCategory, todo.category);
+    }
+    // Generate a list of the names of the returned users.
+
+
+  }
+
+  @Test
+  void getLimit() {
+    Integer intTargetCategory = 2;
+    String targetCategory = intTargetCategory.toString();
+    Map<String, List<String>> queryParams = new HashMap<>();
+    queryParams.put(TodoController.LIMIT_KEY, Arrays.asList(new String[] {targetCategory}));
+    when(ctx.queryParamMap()).thenReturn(queryParams);
+    when(ctx.queryParam(TodoController.LIMIT_KEY)).thenReturn(targetCategory);
+
+    Validation validation = new Validation();
+    // The `AGE_KEY` should be name of the key whose value is being validated.
+    // You can actually put whatever you want here, because it's only used in the generation
+    // of testing error reports, but using the actually key value will make those reports more informative.
+    Validator<Integer> validator = validation.validator(TodoController.LIMIT_KEY, Integer.class, targetCategory);
+    // When the code being tested calls `ctx.queryParamAsClass("age", Integer.class)`
+    // we'll return the `Validator` we just constructed.
+    when(ctx.queryParamAsClass(TodoController.LIMIT_KEY, Integer.class))
+        .thenReturn(validator);
+
+    todoController.getUsers(ctx);
+
+
+    // Confirm that the code being tested calls `ctx.json(…)`, and capture whatever
+    // is passed in as the argument when `ctx.json()` is called.
+    verify(ctx).json(TodoArrayListCaptor.capture());
+    // Confirm that the code under test calls `ctx.status(HttpStatus.OK)` is called.
+    verify(ctx).status(HttpStatus.OK);
+
+    // Confirm that we get back two users.
+    assertEquals(2, TodoArrayListCaptor.getValue().size());
+
+    // Generate a list of the names of the returned users.
+
+
+  }
+
 }
