@@ -485,17 +485,7 @@ public class TodoController implements Controller {
    * @param email the email to generate an avatar for
    * @return a URI pointing to an avatar image
    */
-  String generateAvatar(String email) {
-    String avatar;
-    try {
-      // generate unique md5 code for identicon
-      avatar = "https://gravatar.com/avatar/" + md5(email) + "?d=identicon";
-    } catch (NoSuchAlgorithmException ignored) {
-      // set to mystery person
-      avatar = "https://gravatar.com/avatar/?d=mp";
-    }
-    return avatar;
-  }
+
 
   /**
    * Utility function to generate the md5 hash for a given string

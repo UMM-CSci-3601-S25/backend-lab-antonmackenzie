@@ -12,6 +12,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.jupiter.api.AfterAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,11 +33,13 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import static com.mongodb.client.model.Filters.eq;
 
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
 import io.javalin.json.JavalinJackson;
+import io.javalin.validation.BodyValidator;
 import io.javalin.validation.Validation;
 import io.javalin.validation.Validator;
 
@@ -204,14 +207,7 @@ class TodoControllerSpec {
 
   }
 
-  @Test
-  void getOwnerByCategory()
-  {
-    when(ctx.queryParamMap()).thenReturn(Collections.emptyMap());
 
-    todoController.getUsers(ctx);
-
-  }
   @Test
   void getOwner() {
     String owner = "Chris";
@@ -406,4 +402,74 @@ class TodoControllerSpec {
 
   }
 
+  @Test
+  void addOwner() throws IOException {
+    // Create a new user to add
+    Todo newTodo = new Todo();
+    newTodo.owner = "Scott Pilgrim";
+    newTodo.status = true;
+    newTodo.body = "Fight all seven evil exes and get a job.";
+    newTodo.category = "Defeat the league of evil exes!!!";
+
+    // Use `javalinJackson` to convert the `User` object to a JSON string representing that user.
+    // This would be equivalent to:
+    //   String testnewTodo = """
+    //       {
+    //         "name": "Test User",
+    //         "age": 25,
+    //         "company": "testers",
+    //         "email": "test@example.com",
+    //         "role": "viewer"
+    //       }
+    //       """;
+    // but using `javalinJackson` to generate the JSON avoids repeating all the field values,
+    // which is then less error prone.
+    String newTodoJson = javalinJackson.toJsonString(newTodo, Todo.class);
+
+    // A `BodyValidator` needs
+    //   - The string (`newTodoJson`) being validated
+    //   - The class (`User.class) it's trying to generate from that string
+    //   - A function (`() -> User`) which "shows" the validator how to convert
+    //     the JSON string to a `User` object. We'll again use `javalinJackson`,
+    //     but in the other direction.
+    when(ctx.bodyValidator(Todo.class))
+      .thenReturn(new BodyValidator<>(newTodoJson, Todo.class,
+                    () -> javalinJackson.fromJsonString(newTodoJson, Todo.class)));
+
+    todoController.addNewOwner(ctx);
+    verify(ctx).json(mapCaptor.capture());
+
+    // Our status should be 201, i.e., our new user was successfully created.
+    verify(ctx).status(HttpStatus.CREATED);
+
+    // Verify that the user was added to the database with the correct ID
+    Document addedTodo = db.getCollection("todos")
+        .find(eq("_id", new ObjectId(mapCaptor.getValue().get("id")))).first();
+
+    // Successfully adding the user should return the newly generated, non-empty
+    // MongoDB ID for that user.
+    assertNotEquals("", addedTodo.get("_id"));
+    // The new user in the database (`addedUser`) should have the same
+    // field values as the user we asked it to add (`newTodo`).
+    assertEquals(newTodo.owner, addedTodo.get("owner"));
+    assertEquals(newTodo.status, addedTodo.get("status"));
+    assertEquals(newTodo.body, addedTodo.get("body"));
+    assertEquals(newTodo.category, addedTodo.get("category"));
+  }
+
+  @Test
+  void deleteFoundOwner() throws IOException {
+    String testID = JimmysId.toHexString();
+    when(ctx.pathParam("id")).thenReturn(testID);
+
+    // User exists before deletion
+    assertEquals(1, db.getCollection("todos").countDocuments(eq("_id", new ObjectId(testID))));
+
+    todoController.deleteTodo(ctx);
+
+    verify(ctx).status(HttpStatus.OK);
+
+    // User is no longer in the database
+    assertEquals(0, db.getCollection("todos").countDocuments(eq("_id", new ObjectId(testID))));
+  }
 }
